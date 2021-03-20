@@ -22,9 +22,10 @@ import torch.nn.functional as F
 import torch
 
 
-#Defino hiperparametros
+#I create a folder for the ouput
 os.makedirs("images", exist_ok=True)
 
+#I Set hiperparameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=60, help="size of the batches")
@@ -38,13 +39,14 @@ parser.add_argument("--img_size", type=int, default=28, help="size of each image
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval betwen image samples")
 parser.add_argument("--p", type=float, default=0.3, help="dropout")
+parser.add_argument("--datasize", type=float, default=50000, help="number of data images, irrelevant if using MNIST")
 opt = parser.parse_args()
 print(opt)
 
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 
-#Defino la arquitectura (reducida respecto a la BCE, para lograr mejor performance)
+#I define the NN architectures (smaller than the BCE, because of costly training)
 
 class Generator(nn.Module):
 
@@ -91,7 +93,7 @@ class Discriminator(nn.Module):
                 nn.Linear(512, 256),
                 nn.LeakyReLU(0.2, inplace=True),
                 nn.Linear(256, 1),
-                nn.Sigmoid(), #sin sigmoid, despues veo que onda
+                nn.Sigmoid(),
         )
 
     def forward(self, img):
@@ -101,13 +103,15 @@ class Discriminator(nn.Module):
         return validity
 
 
-#Inicializo las redes
+#I innitialize the NNs
 generator = Generator()
 discriminator = Discriminator()
 
 
 
-#Loadeo los datos (en este cEl MNIST)
+#I load the dataset (in this case the MNIST) as a npy and convert it to pytorch tensor
+#For quick, draw! samples, just copy the loader from the other codes with the desired label
+
 os.makedirs("../../data/mnist", exist_ok=True)
 dataloader = torch.utils.data.DataLoader(
     datasets.MNIST(
@@ -122,24 +126,24 @@ dataloader = torch.utils.data.DataLoader(
     shuffle=True,
 )
 
-# Optimizadores (ADAM con mismo parametros que el paper original del 2014)
+##I use the ADAM optimizer
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
 Tensor =  torch.FloatTensor
 
 # ----------
-#  Entrenamiento
+#  Training
 # ----------
 
 for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
 
-         # Defino real y generado
+         # I define real and generated
         valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
         fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False)
 
-        # Configuro input
+        # Input images
         real_imgs = Variable(imgs.type(Tensor))
         
         # Loss function

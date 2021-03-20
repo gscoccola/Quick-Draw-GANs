@@ -21,9 +21,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
-#Defino hiperparametros
+#I create a folder for the ouput
 os.makedirs("images", exist_ok=True)
 
+#I set the hiperparameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=500, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
@@ -36,14 +37,14 @@ parser.add_argument("--img_size", type=int, default=28, help="size of each image
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=200, help="interval betwen image samples")
 parser.add_argument("--p", type=float, default=0.5, help="dropout")
-parser.add_argument("--datasize", type=float, default=50000, help="number of images of data")
+parser.add_argument("--datasize", type=float, default=50000, help="number of data images")
 parser.add_argument("--ndiscr", type=int, default=3, help="number of discr training per epoch")
 opt = parser.parse_args()
 print(opt)
 
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
-#Defino la arquitectura (extendida respecto a la del paper)
+#I define the NN architectures (Based on the 2014 paper, but with more layers)
 
 class Generator(nn.Module):
     def __init__(self):
@@ -95,15 +96,17 @@ class Discriminator(nn.Module):
 
         return validity
 
-#Funcion de costo BCE
+#I use the BCE Loss function
 adversarial_loss = torch.nn.BCELoss()
 
-#Inicializo las redes
+#I innitialize the NNs
 generator = Generator()
 discriminator = Discriminator()
 
+#
+#I load the dataset (in this case circle) as a npy and convert it to pytorch tensor
+#For other labels, just change the name file
 
-#Loadeo los datos (en este caso circle) de un archivo npy y lo paso a tensor torch
 data=np.load('full_numpy_bitmap_circle.npy',
                       mmap_mode=None, allow_pickle=True, fix_imports=True, encoding='ASCII')
 
@@ -118,52 +121,52 @@ for i in range(0,28):
 dataloader=torch.utils.data.DataLoader(dataset=data3,
                                        batch_size=opt.batch_size, shuffle=True)
 
-# Optimizadores (ADAM con mismo parametros que el paper original del 2014)
+#I use the ADAM optimizer (with the same parameters as the 2014 papers)
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
 Tensor = torch.FloatTensor
 
 # ----------
-#  Entrenamiento
+#  Training
 # ----------
 
 for epoch in range(opt.n_epochs):
     for i, imgs in enumerate(dataloader):
 
-        # Defino real y generado
+        # I define real and generated
         valid = Variable(Tensor(imgs.size(0), 1).fill_(1.0), requires_grad=False)
         fake = Variable(Tensor(imgs.size(0), 1).fill_(0.0), requires_grad=False)
 
-        # Configuro input
+        # Input images
         real_imgs = Variable(imgs.type(Tensor))
 
         # -----------------
-        #  Entrenamiento del generador
+        #  Generator training
         # -----------------
 
         optimizer_G.zero_grad()
 
-        # Sampleo de la dimension latente
+        # I sample the latent dimension
         z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim))))
 
-        # Genero imágenes
+        #Generated Images
         gen_imgs = generator(z)
 
-        # Calculo la perdida
+        # Generator loss
         g_loss = adversarial_loss(discriminator(gen_imgs), valid)
 
         g_loss.backward()
         optimizer_G.step()
 
         # ---------------------
-        #  Entro en el discriminador (varias veces por época)
+        #  Discriminator training (several iterations per epoch)
         # ---------------------
         
         for k in range(0,opt.ndiscr):
             optimizer_D.zero_grad()
         
-            # Perdida del discriminador
+            # Discriminator loss
             real_loss = adversarial_loss(discriminator(real_imgs), valid)
             fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
             d_loss = (real_loss + fake_loss) / 2
@@ -177,6 +180,8 @@ for epoch in range(opt.n_epochs):
         )
 
         batches_done = epoch * len(dataloader) + i
-        #Guardo samples generadas
+        
+        #I save the generated images, according to the sampling parameter
+        
         if batches_done % opt.sample_interval == 0:
             save_image(-gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
